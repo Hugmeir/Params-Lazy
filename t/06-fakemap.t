@@ -2,13 +2,15 @@ use strict;
 use warnings;
 
 use Test::More;
-use Params::Lazy fakemap => "^@" => sub {
+
+sub fakemap {
    my $code = shift;
    my @ret;
    push @ret, force($code) for @_;
    return @ret;
-},
-fakegrep => "^@" => sub {
+}
+
+sub fakegrep {
    my $code = shift;
    my @ret;
    while ( my ($i, $v) = each @_ ) {
@@ -16,7 +18,10 @@ fakegrep => "^@" => sub {
       push @ret, $_ if force($code);
    }
    return @ret;
-};
+}
+
+use Params::Lazy fakemap  => "^@",
+                 fakegrep => "^@";
 
 my @results = fakemap "<$_>", 1..10;
 

@@ -35,7 +35,7 @@ static MGVTBL vtbl = {
   NULL, /* dup */
 #endif
 #ifdef MGf_LOCAL
-    NULL /* local */
+  NULL /* local */
 #endif
 };
 
@@ -127,105 +127,69 @@ PPCODE:
     MAGIC *mg       = SvMAGIC(SvRV(sv));
     delay_ctx *ctx  = (void *)mg->mg_ptr;
     const I32 gimme = GIMME_V;
-    AV *tmpstack    = MUTABLE_AV(sv_2mortal(newSV_type(SVt_PVAV)));
-    AV * orig_mainstack = PL_mainstack;
-    AV *curstack    = PL_curstack;
     I32 i;
-    
-    ENTER;
+    /* PL_curstack and PL_stack_sp in the delayed OPs */
+    AV *delayed_curstack;
+    SV **delayed_sp;
 
-    SAVEVPTR(PL_op);
-    SAVEVPTR(PL_markstack);
-    SAVEVPTR(PL_markstack_ptr);
-    SAVEVPTR(PL_markstack_max);
+    SAVEOP();
     SAVECOMPPAD();
 
-    av_push(tmpstack, &PL_sv_undef);
+    PUSHSTACK;
 
-    /* We want the deferred ops to have their original stack, but
-     * can't use that directly since we could step on newer stuff.
-     * So tell curstackinfo that we're using the old stack, but set
-     * PL_curstack to the AV we created above */
-    SWITCHSTACK(PL_curstack,tmpstack);
-    //PL_curstackinfo     = ctx->si;
-    
-    /* XXX TODO WIP this is in case the deferred ops die,
-     * currently works by luck and snake oil */
-    PL_mainstack = tmpstack;
-    
-    PL_stack_base   = AvARRAY(tmpstack);
-    PL_stack_sp     = PL_stack_base;
-    PL_stack_max    = PL_stack_base + AvMAX(tmpstack);
-    
-    Newxz(PL_markstack, 32, I32);
-    PL_markstack_ptr = PL_markstack;
-    PL_markstack_max = PL_markstack + 32;
-    
-    /* The SAVECOMPPAD above will restore these */
+    /* The SAVECOMPPAD and SAVEOP will restore these */
     PL_curpad  = AvARRAY(ctx->comppad);
     PL_comppad = ctx->comppad;
-
-    /* SAVEVPTR will restore this */
-    PL_op = ctx->delayed;
+    PL_op      = ctx->delayed;
     
-    PUTBACK;
-    SPAGAIN;
-    ENTER;
-    SAVETMPS;
-
-    PUSHMARK(SP);
+    PUSHMARK(PL_stack_sp);
     
-    IV before = (IV)(SP-PL_stack_base);
+    IV before = (IV)(PL_stack_sp-PL_stack_base);
 
     /* Call the deferred ops */
     CALLRUNOPS(aTHX);
 
-    SPAGAIN;
+    //SPAGAIN;
 
-    IV retvals = (IV)(SP-PL_stack_base);
+    IV retvals = (IV)(PL_stack_sp-PL_stack_base);
 
-    /* We want these to stay alive until after we've
-     * switched the stack back so we can copy them over
-     */    
-    if ( gimme != G_VOID ) {
-      for (i = retvals; i > before; i--) {
-        SvREFCNT_inc_simple_void_NN(*(SP-i+1));
-      }
+    /* Keep a pointer to PL_curstack, and increase the
+     * refcount so that it doesn't get freed in the
+     * POPSTACK below.
+     * Also keep a pointer to PL_stack_sp so we can copy
+     * the values at the end.
+     */
+    if ( retvals && gimme != G_VOID ) {
+        delayed_curstack = MUTABLE_AV(SvREFCNT_inc_simple_NN(PL_curstack));
+        delayed_sp = PL_stack_sp;
+
+        /* This has two uses.  First, it stops these from
+         * being freed early after the FREETMPS/POPSTACK;
+         * second, this is the ref we mortalize later,
+         * with the mPUSHs
+         */
+        for (i = retvals; i > before; i--) {
+            SvREFCNT_inc_simple_void_NN(*(PL_stack_sp-i+1));
+        }
     }
 
-    FREETMPS;
-    PUTBACK;
-    LEAVE;
-
-    /* Undo everything we did before */
-    PL_mainstack = orig_mainstack;
-
-    SWITCHSTACK(PL_curstack,curstack);
-
-    PL_stack_base    = AvARRAY(PL_curstack);
-    PL_stack_sp      = PL_stack_base + AvFILLp(PL_curstack);
-    PL_stack_max     = PL_stack_base + AvMAX(PL_curstack);
-    
-    Safefree(PL_markstack);
-
-    PUTBACK;
+    (void)POPMARK;
+    POPSTACK;
     SPAGAIN;
-    LEAVE;
     
     PUSHMARK(SP);
     
     (void)POPs;
- 
-    if ( gimme != G_VOID ) {
-        EXTEND(SP, retvals);
-    
-        SV **mysp = AvARRAY(tmpstack);
-        for (i = before; i++ < retvals; i) {
-          SvREFCNT_inc_simple_void_NN(*(mysp+i));
-          mPUSHs(*(mysp+i));
-        }
-    }
 
+    if ( retvals && gimme != G_VOID ) {
+        EXTEND(SP, retvals);
+        
+        for (i = retvals; i-- > before;) {
+            mPUSHs(*(delayed_sp-i));
+        }
+        SvREFCNT_dec(delayed_curstack);
+    }
+    
     (void)POPMARK;
 
     

@@ -4,89 +4,250 @@ use warnings;
 use Test::More;
 use Params::Lazy;
 
-use Devel::Peek;
+sub stress_test {
+    my @orig = @_;
+    my %returns;
 
-sub eeyup { warn "      output of warn inside a sub, \@_: <@_>"; return "ledoof", "daslist" }
-
-use Devel::Peek;
-
-sub delay {
-    my $private = "Don't look!";
-    local $_ = "hohooh";
-    print STDERR "in delay: <@_>\n";
-    #Dump($_[0]);
-    my $x;
-    #Dump(\$x);
-    $x = force($_[0]);
-    #Dump(\$x);
-    #() = $x;
+    local $_ = "set in stress_test";
+    
+    my $x = force($_[0]);
+    $returns{scalar} = $x;
     my @x = force($_[0]);
-    my $f = join "", "<", force($_[0]), ">\n";
-    print STDERR "$f";
-    warn force($_[0]);
-    print STDERR "print STDERR MAGIC_VAR: ", force($_[0]), "\n";
-    warn "foo", force($_[0]), "bar";
-    #Dump($x);
-    print STDERR "test: ", $x, "\n";
-    print STDERR "\@x:<@x>\n<@_>\n";
-    #Dump($_[0]);
-    print "Exiting the sub\n\n";
+    $returns{list} = \@x;
+    my $j = join "", "<", force($_[0]), ">";
+    $returns{join} = $j;
+
+    open my $fh, ">", \my $tmp;    
+    print $fh "<", force($_[0]), ">";
+    close $fh;
+    $returns{print} = $tmp;
+    
+    {
+        my $w = "";
+        local $SIG{__WARN__} = sub { $w .= shift };
+        warn force($_[0]);
+        my $file = __FILE__;
+        $returns{warn} = $w =~ s/ at $file.+//sre;
+        $w = "";
+        warn "<", force($_[0]), ">";
+        $returns{warn_list} = $w =~ s/ at $file.+//sre;
+    }
+    
+    $returns{eval} = eval 'force($_[0])';
+    
+    is_deeply(
+        \@orig,
+        \@_,
+        "force() doesn't touch \@_"
+    );
+    
+    return \%returns;
 }
 
-BEGIN { Params::Lazy::cv_set_call_checker_delay(\&delay, '^;@') }
-my @a = qw( a b );
-my @b = qw( c d );
-print STDERR "before\n";
+sub run {
+    my ($code, %args) = @_;
+    my $times = $args{times} // 1;
+    my @ret;
+    push @ret, force($code) while $times-- > 0;
+    return @ret;
+}
 
+use Params::Lazy run => '^;@', stress_test => '^;@';
 
-delay(warn("     this is a warn\n"));
 {
-my $t = 0;
-delay(print("\tlexwrap test ", $t++, "\n"), @b);# for 1..3;
+    my $w = "";
+    local $SIG{__WARN__} = sub { $w .= shift };
+    run(warn("From warn"), times => 5);
+    my @matched = $w =~ /(From warn)/g;
+    is(@matched, 5, "warned five times");
+}
+{
+    my $x = 0;
+    my $t = 0;
+    my @ret = run($x += ++$t, times => 3);
+    is($x, 6);
+    is($t, 3);
+    is_deeply(\@ret, [1,3,6]);
 }
 
-delay(rand(111), 1);
-delay(scalar eeyup(1231), @a);
-delay(eeyup(1231), @a);
-delay(scalar map(print("  scalar map: $_\n"), 1..5), 2);
-delay(map(print("  map: $_\n"), 1..5), 2);
-delay("dollar under: <$_>");
+sub contextual_return { return wantarray ? (@_, "one", "two") : "scalar: @_" }
 
-delay(do { eeyup("How do you sir"), "from do" }, 4);
-sub sudo_make_me_a_hashref { warn("Making a hashref"); qw(a 1 b 2) }
-delay({ sudo_make_me_a_hashref });
+my $ret = stress_test(rand(111), 1);
 
-#our $private;
-#delay(sub { CORE::say $private }->());
+#^TODO
 
-print STDERR "after\n";
+$ret = stress_test(scalar contextual_return("argument one", "argument two"));
 
+is_deeply($ret, {
+    list => ['scalar: argument one argument two'],
+    map({ $_ => 'scalar: argument one argument two' } qw(scalar warn eval)),
+    map({ $_ => '<scalar: argument one argument two>' } qw(join print warn_list))
+}, "delay scalar sub(...)");
+
+$ret = stress_test(contextual_return(1234, 12345, 123456));
+my @expect = (1234, 12345, 123456, "one", "two");
+is_deeply($ret, {
+    scalar => 'two',
+    eval   => 'two',
+    list   => [@expect],
+    warn   => join("", @expect),
+    map({ $_ => join "", "<", @expect, ">" } qw(join print warn_list))
+}, "delay sub(...)");
+
+
+$ret = stress_test(scalar map("scalar map: $_", 1..5), 2);
+is_deeply($ret, {
+    map({ $_ => 5 } qw(scalar warn eval)),
+    list   => [5],
+    map({ $_ => join "", "<", 5, ">" } qw(join print warn_list))
+}, "delay scalar map");
+
+$ret = stress_test(map("map: $_", 1..5), 2);
+@expect = map("map: $_", 1..5);
+is_deeply($ret, {
+    scalar => 'map: 5',
+    eval   => 'map: 5',
+    list   => [@expect],
+    warn   => join("", @expect),
+    map({ $_ => join "", "<", @expect, ">" } qw(join print warn_list))
+}, "delay map");
+
+$ret = stress_test("dollar under: <$_>");
+my $expect = "dollar under: <set in stress_test>";
+is_deeply($ret, {
+    map({ $_ => $expect } qw(scalar warn eval)),
+    list   => [$expect],
+    map({ $_ => join "", "<", $expect, ">" } qw(join print warn_list))
+}, "delay qq{\$_}");
+
+{
+    my $_ = "lexical"; 
+    $ret = stress_test("my dollar under: <$_>");
+    my $expect = "my dollar under: <lexical>";
+    is_deeply($ret, {
+        map({ $_ => $expect } qw(scalar warn eval)),
+        list   => [$expect],
+        map({ $_ => join "", "<", $expect, ">" } qw(join print warn_list))
+    }, "my \$_ = ...; delay qq{\$_}");
+}
+
+$ret = stress_test(do { my $x = sub { shift }->("from do"); $x }, 4);
+is_deeply($ret, {
+    map({ $_ => 'from do' } qw(scalar warn eval)),
+    list   => ['from do'],
+    map({ $_ => join "", "<", 'from do', ">" } qw(join print warn_list))
+}, "delay do {...}");
+
+sub return_a_list { qw(a 1 b 2) }
+my @ret = run({ return_a_list });
+is_deeply(\@ret, [{qw(a 1 b 2)}] );
+
+my $where;
 sub passover {
     my $delay = shift;
+    $where .= 1;
     return takes_delayed($delay);
 }
 sub takes_delayed {
-    my $delay = shift;
-    CORE::say "Inside takes_delayed:";
-    () = force($delay)
+    my $d = shift;
+    $where .= 2;
+    force($d);
+    sub { force($d) }->();
+    if ( $^V >= v5.10 ) {
+        eval q{ my    $_ = 4; force($d) };
+        eval q{ CORE::state $_ = 5; force($d) };
+    }
+    else {
+        $where .= 33;
+    }
+    sub { our   $_ = 6; force($d) }->();
+    sub { our $_; local $_ = 7; force($d) }->();
+    $where .= 8;
 };
-BEGIN { Params::Lazy::cv_set_call_checker_delay(\&passover, '^;@') }
+use Params::Lazy passover => '^';
 
-passover(warn("  I'm a delayed argument!"));
+{
+    $_ = 3;
+    passover($where .= $_);
+}
+is($where, 123333678, "can pass delayed arguments to other subs and use them");
+
+if ( $^V >= v5.10 ) {
+    eval q{
+        $where = "";
+        my $_ = 3;
+        passover($where .= $_);
+    };
+    
+    is(
+        $where,
+        123333338,
+        "...and it grabs the right version of a variable"
+    );
+}
 
 sub return_delayed { return shift }
-BEGIN { Params::Lazy::cv_set_call_checker_delay(\&return_delayed, '^;@') }
+use Params::Lazy return_delayed => '^;@';
 
+my $delay = "";
 my $d = do {
-    my $foo = "1234561";
-    my $f = return_delayed(warn("Returned delayed argument! <$foo>"));
-    () = force($f);
+    my $foo = "_1_";
+    my $f = return_delayed($delay .= $foo);
+    is($delay, "", "sanity test");
+    force($f);
+    is($delay, "_1_", "can return a delayed argument and use it");
+    force($f);
+    is($delay, "_1__1_", "..multiple times");
     $f;
 };
 
-CORE::say "We got this man: $d";
-() = force($d);
+{
+    my $w = "";
+    local $SIG{__WARN__} = sub { $w .= shift };
+    force($d);
+    is($delay, "_1__1_", "Delayed arguments are not closures");
+    like(
+        $w,
+        qr/Use of uninitialized value \$foo in concatenation/,
+        "Warns if a delayed argument used a variable that went out of scope"
+    );
+}
 
-#ok(1);
+$d = do {
+    my $_ = "_55_";
+    my $f = return_delayed("<$_>");
+    is(
+        force($f),
+        "<$_>",
+        "can return a delayed argument referencing a lexical \$_ and use it"
+    );
+    
+    is(
+        eval 'force($f)',
+        "<$_>",
+        "eval 'force(delayed arg that references a lexical)'"
+    );
+    
+=begin Segfaults, Not actually supported, pathological
+    for my $sub (
+        sub { force($d) },
+        sub { my    $_ = "_66_"; force($d) },
+        sub { state $_ = "_77_"; force($d) },
+        sub { our   $_ = "_88_"; force($d) },
+        sub { our $_; local $_ = "_99_"; force($d) },
+        )
+    {
+        my $w = "";
+        local $SIG{__WARN__} = sub { $w .= shift };
 
-#done_testing;
+        $sub->();
+        like(
+            $w,
+            qr/Use of uninitialized value \$_/,
+            ""
+        );
+    }
+=cut
+};
+
+done_testing;

@@ -7,8 +7,8 @@ use warnings FATAL => 'all';
 use Carp;
 
 require Exporter;
-our @ISA = qw(Exporter);
-our @EXPORT = "force";
+our @ISA       = qw(Exporter);
+our @EXPORT    = "force";
 our @EXPORT_OK = "force";
 
 our $VERSION = '0.01';
@@ -17,25 +17,23 @@ require XSLoader;
 XSLoader::load('Params::Lazy', $VERSION);
 
 sub import {
-   my $self = shift;
-   while (@_) {
-      my ($name, $proto, $sub) = splice(@_, 0, 3);
-      if (grep !defined, $name, $proto, $sub) {
-         croak("yadda");
-      }
-      
-      if ($name !~ /::/) {
-         $name = scalar caller() . "::" . $name;
-      }
-      
-      my $glob = do { no strict "refs"; *$name };
-      
-      *$glob = $sub;
-      
-      Params::Lazy::cv_set_call_checker_delay($sub, $proto);
-   }
-   
-   $self->export_to_level(1);
+    my $self = shift;
+    while (@_) {
+        my ($name, $proto) = splice(@_, 0, 2);
+        if (grep !defined, $name, $proto) {
+           croak("yadda");
+        }
+
+        if ($name !~ /::/) {
+           $name = scalar caller() . "::" . $name;
+        }
+
+        my $glob = do { no strict "refs"; *$name };
+
+        Params::Lazy::cv_set_call_checker_delay(*{$glob}{CODE}, $proto);
+    }
+
+    $self->export_to_level(1);
 }
 
 1;
@@ -58,31 +56,40 @@ Quick summary of what the module does.
 
 Perhaps a little code snippet.
 
-    use Params::Lazy;
+    sub fakemap {
+       my $delayed = shift;
+       my @retvals;
+       push @retvals, force($delayed) for @_;
+       return @retvals;
+    }
+    use Params::Lazy fakemap => "^@";
 
-    my $foo = Params::Lazy->new();
+    my @goodies = fakemap "<$_>\n", 1..10;
     ...
 
 =head1 EXPORT
 
-A list of functions that can be exported.  You can delete this section
-if you don't export anything, such as for a purely object-oriented module.
+=head2 force($delayed)
 
-=head1 SUBROUTINES/METHODS
+Runs the delayed code.
 
-=head2 function1
+=head1 LIMITATIONS
 
-=cut
+At the moment, running a delayed eval {} or eval STRING will cause
+Perl to panic.  That is, this:
 
-sub function1 {
-}
+    delayed eval { ... };
 
-=head2 function2
+Is no good, although as a minor workaround, this:
 
-=cut
+    sub delayed {
+       my $ret = eval { force($_[0]) };
+       ...
+    }
 
-sub function2 {
-}
+    delayed die();
+
+will work.
 
 =head1 AUTHOR
 
