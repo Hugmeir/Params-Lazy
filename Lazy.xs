@@ -3,6 +3,70 @@
 #include "XSUB.h"
 
 #include "ppport.h"
+#include "callchecker0.h"
+
+#if (PERL_REVISION == 5 && PERL_VERSION >= 10)
+#  define GOT_CUR_TOP_ENV
+#  ifndef PL_restartjmpenv
+#    define PL_restartjmpenv    cxstack[cxstack_ix+1].blk_eval.cur_top_env
+#  endif
+#endif
+
+#ifndef MUTABLE_AV
+#  define MUTABLE_AV(p)   ((AV *)(void *)(p))
+#endif
+
+#ifndef save_op
+#  define save_op()     save_pushptr((void *)(PL_op), SAVEt_OP)
+#endif
+
+#ifndef save_pushptr
+#  define save_pushptr(a,b) THX_save_pushptr(aTHX_ a, b)
+void
+THX_save_pushptr(pTHX_ void *const ptr, const int type)
+{
+    dVAR;
+    SSCHECK(2);
+    SSPUSHPTR(ptr);
+    SSPUSHINT(type);
+}
+#endif
+
+#ifndef LINKLIST
+#    define LINKLIST(o) ((o)->op_next ? (o)->op_next : op_linklist((OP*)o))
+#  ifndef op_linklist
+#    define op_linklist(o) THX_linklist(aTHX_ o)
+OP *
+THX_linklist(pTHX_ OP *o)
+{
+    OP *first;
+
+    if (o->op_next)
+        return o->op_next;
+
+    /* establish postfix order */
+    first = cUNOPo->op_first;
+    if (first) {
+        OP *kid;
+        o->op_next = LINKLIST(first);
+        kid = first;
+        for (;;) {
+            if (kid->op_sibling) {
+                kid->op_next = LINKLIST(kid->op_sibling);
+                kid = kid->op_sibling;
+            } else {
+                kid->op_next = o;
+                break;
+            }
+        }
+    }
+    else
+        o->op_next = o;
+
+    return o->op_next;
+}
+#  endif
+#endif
 
 typedef struct {
  OP *delayed;
@@ -76,7 +140,7 @@ replace_with_delayed(pTHX_ OP* aop) {
     /* Then put that in place of the OPs we removed, but wrap
      * as a ref.
      */
-    new_op = (OP*)newSVOP(OP_CONST, 0, newRV(magic_sv));
+    new_op = (OP*)newSVOP(OP_CONST, 0, newRV_noinc(magic_sv));
     new_op->op_sibling = sib;
     return new_op;
 }
@@ -125,6 +189,9 @@ PREINIT:
     delay_ctx *ctx;
     const I32 gimme = GIMME_V;
     I32 i, oldscope;
+#ifndef GOT_CUR_TOP_ENV
+    JMPENV *cur_top_env;
+#endif
     IV retvals, before;
     int ret = 0;
     /* PL_curstack and PL_stack_sp in the delayed OPs */
@@ -161,7 +228,11 @@ PPCODE:
      * pseudo-block with an eval inside, and that eval dying.
      */
     
-    oldscope = PL_scopestack_ix;
+
+    oldscope    = PL_scopestack_ix;
+#ifndef GOT_CUR_TOP_ENV
+    cur_top_env = PL_top_env;
+#endif
     JMPENV_PUSH(ret);
 
     switch (ret) {
@@ -173,8 +244,16 @@ PPCODE:
             /* If there's a PL_restartop, then this eval can handle
              * things on their own.
              */
-            if (PL_restartop && PL_restartjmpenv == PL_top_env) {
+            if (PL_restartop &&
+#ifdef GOT_CUR_TOP_ENV
+                PL_restartjmpenv == PL_top_env
+#else
+                cur_top_env      == PL_top_env
+#endif
+            ) {
+#ifdef GOT_CUR_TOP_ENV
                 PL_restartjmpenv = NULL;
+#endif
                 PL_op = PL_restartop;
                 PL_restartop = 0;
                 goto redo_body;
