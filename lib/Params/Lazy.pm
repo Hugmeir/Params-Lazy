@@ -71,7 +71,7 @@ Version 0.01
     }
     use Params::Lazy fakemap => '^@';
 
-    my @goodies = fakemap "<$_>", 1..10; # same as map "<$_>, 1..10;"
+    my @goodies = fakemap "<$_>", 1..10; # same as map "<$_>", 1..10;
     ...
 
 =head1 DESCRIPTION
@@ -86,8 +86,7 @@ string.  Every caret in that string is taken to mean "make this a lazy
 argument."
 After that, when the function is called, instead of receiving the
 result of whatever expression the caller put there, the delayed
-arguments will instead be a simple scalar variable with the string
-'STATEMENT'.  Only if you pass that variable to C<force()> will the
+arguments will instead be a simple scalar reference.  Only if you pass that variable to C<force()> will the
 delayed expression be run.
 
 =head1 EXPORT
@@ -107,7 +106,7 @@ and your cat.
 
 Finally, delayed arguments, although intended to be faster & more light
 weight than coderefs, are currently about twice as slow as passing
-a coderef and dereferencing it.
+a coderef and dereferencing it, so beware!
 
 =head1 AUTHOR
 
