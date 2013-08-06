@@ -121,16 +121,25 @@ CODE:
 
 void
 force(SV *sv)
-PPCODE:
-    dSP;
-    
-    MAGIC *mg       = SvMAGIC(SvRV(sv));
-    delay_ctx *ctx  = (void *)mg->mg_ptr;
+PREINIT:
+    delay_ctx *ctx;
     const I32 gimme = GIMME_V;
-    I32 i;
+    I32 i, oldscope;
+    IV retvals, before;
+    int ret = 0;
     /* PL_curstack and PL_stack_sp in the delayed OPs */
     AV *delayed_curstack;
     SV **delayed_sp;
+PPCODE:
+    dSP;
+    dJMPENV;
+
+    if ( SvROK(sv) && SvMAGICAL(SvRV(sv)) ) {
+        ctx  = (void *)SvMAGIC(SvRV(sv))->mg_ptr;
+    }
+    else {
+        croak("force() requires a delayed argument");
+    }
 
     SAVEOP();
     SAVECOMPPAD();
@@ -144,14 +153,50 @@ PPCODE:
     
     PUSHMARK(PL_stack_sp);
     
-    IV before = (IV)(PL_stack_sp-PL_stack_base);
-
+    before = (IV)(PL_stack_sp-PL_stack_base);
+    
     /* Call the deferred ops */
-    CALLRUNOPS(aTHX);
+    /* Unfortunately we can't just do a CALLRUNOPS, since we must
+     * handle the case of the delayed op being an eval, or a
+     * pseudo-block with an eval inside, and that eval dying.
+     */
+    
+    oldscope = PL_scopestack_ix;
+    JMPENV_PUSH(ret);
 
-    //SPAGAIN;
+    switch (ret) {
+        case 0:
+            redo_body:
+            CALLRUNOPS(aTHX);
+            break;
+        case 3:
+            /* If there's a PL_restartop, then this eval can handle
+             * things on their own.
+             */
+            if (PL_restartop && PL_restartjmpenv == PL_top_env) {
+                PL_restartjmpenv = NULL;
+                PL_op = PL_restartop;
+                PL_restartop = 0;
+                goto redo_body;
+            }
+            /* if there isn't, and the scopestack is out of sync,
+             * then we need to intervene.
+             */
+            if ( PL_scopestack_ix >= oldscope ) {
+                /* lazy eval { die }, lazy do { eval { die } } */
+                /* Leave the eval */
+                LEAVE;
+                break;
+            }
+            /* Fallthrough */
+        default:
+            /* Default behavior */
+            JMPENV_POP;
+            JMPENV_JUMP(ret);
+    }
+    JMPENV_POP;
 
-    IV retvals = (IV)(PL_stack_sp-PL_stack_base);
+    retvals = (IV)(PL_stack_sp-PL_stack_base);
 
     /* Keep a pointer to PL_curstack, and increase the
      * refcount so that it doesn't get freed in the
@@ -175,6 +220,7 @@ PPCODE:
 
     (void)POPMARK;
     POPSTACK;
+    
     SPAGAIN;
     
     PUSHMARK(SP);

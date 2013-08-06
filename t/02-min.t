@@ -46,7 +46,7 @@ test_refcnt(return_ref(), 1);
 
 my $foo = \100;
 my $bar = \$foo;
-test_refcnt($foo, 2);
+test_refcnt($foo, 1);
 
 my @test;
 sub test_delay {

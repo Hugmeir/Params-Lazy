@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Test::More;
+use Test::More tests => 16;
 
 sub lazy_run { force($_[0]) };
 
@@ -36,16 +36,41 @@ is(
     "lazy_run eval q{ lives } works"
 );
 
-lazy_run do {
-    eval { die "I died inside an do { eval {} }" }
-}; warn "<$@>";
+my $msg = "eval q{die}";
+lazy_run eval qq{ die "$msg" };
+like($@, qr/\Q$msg/, $msg);
 
+$msg = "evalbytes q{die}";
+lazy_run CORE::evalbytes qq{ die "$msg" };
+like($@, qr/\Q$msg/, $msg);
+
+$msg = "eval { eval q{die}; foo; die }";
 lazy_run eval {
-    die "I died inside an eval {}"
-}; warn "<$@>";
+    eval 'die q{Inner}';
+    like($@, qr/Inner/, "eval q{die} inside a delayed eval {}");
+    die $msg;
+};
+like($@, qr/\Q$msg/, $msg);
 
-lazy_run eval q{ die "I died inside an eval STRING" };
-warn "<$@>";
+$msg = "do { eval {die}; foo() }";
+lazy_run do {
+    eval { die $msg };
+    pass("Code after an eval { die } inside a do.");
+};
+like($@, qr/\Q$msg/, $msg);
 
+$msg = "eval {die}";
+lazy_run eval {
+    die $msg
+};
+like($@, qr/\Q$msg/, $msg);
 
-done_testing;
+$msg = "map eval { die }, 1..10";
+lazy_run map eval { die $msg }, 1..10;
+like($@, qr/\Q$msg/, $msg);
+
+$msg = "map { eval {die}; \$_ } 1..10";
+my @ret = lazy_run map { eval { die $msg }; $_ } 1..10;
+like($@, qr/\Q$msg/, $msg);
+is_deeply(\@ret, [1..10]);
+

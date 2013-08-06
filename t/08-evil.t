@@ -30,9 +30,26 @@ use Params::Lazy modify_params_list => '^;@';
 my @ret = modify_params_list(shift(@_), 1..10);
 is_deeply(\@ret, [1..10], "can modify \@_ from a lazy arg");
 
-=begin Might need to mark the bloock as multicall...
 sub run_evil { force($_[0]); fail("Should never reach here") }
 use Params::Lazy run_evil => '^';
+
+my $pid = open my $pipe, '-|';
+
+if (defined $pid) {    
+    if ( $pid ) {
+        my @out = <$pipe>;
+        waitpid $pid, 0;
+        my $exit_status = $? >> 8;
+        is($exit_status, 150, "lazy_run exit()");
+        is(join("", @out), "", "..doesn't produce unexpected output");
+    }
+    else {
+        run_evil exit(150);
+        die "Should never reach here";
+    }
+}
+
+=begin goto, Pathological
 
 no warnings 'deprecated';
 run_evil do { goto DOO; };

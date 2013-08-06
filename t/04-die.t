@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Carp qw(carp croak confess);
-use Test::More;
+use Test::More tests => 19;
 
 sub lazy_death {
     eval { force($_[0]) };
@@ -113,4 +113,3 @@ call_lazy_death();
 
 pass("Survived this far");
 
-done_testing;
