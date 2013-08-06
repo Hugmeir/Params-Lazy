@@ -22,10 +22,13 @@ sub {
         "lazy_run \$_[1], 'foo'; returns foo"
 }->('I am in $_[0]');
 
-"a" =~ /(.)/;
-my $lazy = lazy_return "foo" =~ /(foo)(?{is($^N, "foo", "the regex matched")})/;
-force($lazy);
-is($1, "foo", "...and \$1 got updated");
+# Crashes on 5.10.1
+if ( $] != 5.010001 ) {
+    "a" =~ /(.)/;
+    my $lazy = lazy_return "foo" =~ /(foo)(?{is($^N, "foo", "the regex matched")})/;
+    force($lazy);
+    is($1, "foo", "...and \$1 got updated");
+}
 
 my $t = "&force works";
 is(lazy_ampforce($t), $t, $t);

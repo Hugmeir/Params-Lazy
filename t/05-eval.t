@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 16;
+use Test::More tests => $] >= 5.016 ? 20 : 19;
 
 sub lazy_run { force($_[0]) };
 
@@ -40,9 +40,18 @@ my $msg = "eval q{die}";
 lazy_run eval qq{ die "$msg" };
 like($@, qr/\Q$msg/, $msg);
 
-$msg = "evalbytes q{die}";
-lazy_run CORE::evalbytes qq{ die "$msg" };
-like($@, qr/\Q$msg/, $msg);
+if ( $] >= 5.016 ) {
+    BEGIN {
+        eval {
+            require feature;
+            feature->import('evalbytes');
+        } or eval q{sub evalbytes ($) {}};
+    }
+    no warnings 'ambiguous';
+    $msg = "evalbytes q{die}";
+    lazy_run evalbytes qq{ die "$msg" };
+    like($@, qr/\Q$msg/, $msg);
+}
 
 $msg = "eval { eval q{die}; foo; die }";
 lazy_run eval {
@@ -65,6 +74,13 @@ lazy_run eval {
 };
 like($@, qr/\Q$msg/, $msg);
 
+{
+    local $_ = "doof";
+    my $ret = lazy_run eval { eval 'die'; eval 'qq{_${_}_}' };
+    is($@, "", "nested delayed evals work");
+    is($ret, "_doof_", "...and gets the correct return value");
+}
+
 $msg = "map eval { die }, 1..10";
 lazy_run map eval { die $msg }, 1..10;
 like($@, qr/\Q$msg/, $msg);
@@ -74,3 +90,7 @@ my @ret = lazy_run map { eval { die $msg }; $_ } 1..10;
 like($@, qr/\Q$msg/, $msg);
 is_deeply(\@ret, [1..10]);
 
+$msg = "map { eval 'die'; eval qq{_\${_}_} } 1..10";
+@ret = lazy_run map { eval { eval 'die'; eval 'qq{_${_}_}' }; } 1..10;
+is($@, '', $msg);
+is_deeply(\@ret, [map "_${_}_", 1..10]);

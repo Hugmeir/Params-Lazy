@@ -17,7 +17,7 @@ sub stress_test {
     my $j = join "", "<", force($_[0]), ">";
     $returns{join} = $j;
 
-    open my $fh, ">", \my $tmp;    
+    open my $fh, ">", \my $tmp;
     print $fh "<", force($_[0]), ">";
     close $fh;
     $returns{print} = $tmp;
@@ -27,10 +27,10 @@ sub stress_test {
         local $SIG{__WARN__} = sub { $w .= shift };
         warn force($_[0]);
         my $file = __FILE__;
-        $returns{warn} = $w =~ s/ at $file.+//sre;
+        ($returns{warn}) = $w =~ m/(\A.+?) at $file/s;
         $w = "";
         warn "<", force($_[0]), ">";
-        $returns{warn_list} = $w =~ s/ at $file.+//sre;
+        ($returns{warn_list}) = $w =~ m/(\A.+?) at $file/s;
     }
     
     $returns{eval} = eval 'force($_[0])';
@@ -46,7 +46,7 @@ sub stress_test {
 
 sub run {
     my ($code, %args) = @_;
-    my $times = $args{times} // 1;
+    my $times = defined($args{times}) ? $args{times} : 1;
     my @ret;
     push @ret, force($code) while $times-- > 0;
     return @ret;
@@ -120,17 +120,6 @@ is_deeply($ret, {
     map({ $_ => join "", "<", $expect, ">" } qw(join print warn_list))
 }, "delay qq{\$_}");
 
-{
-    my $_ = "lexical"; 
-    $ret = stress_test("my dollar under: <$_>");
-    my $expect = "my dollar under: <lexical>";
-    is_deeply($ret, {
-        map({ $_ => $expect } qw(scalar warn eval)),
-        list   => [$expect],
-        map({ $_ => join "", "<", $expect, ">" } qw(join print warn_list))
-    }, "my \$_ = ...; delay qq{\$_}");
-}
-
 $ret = stress_test(do { my $x = sub { shift }->("from do"); $x }, 4);
 is_deeply($ret, {
     map({ $_ => 'from do' } qw(scalar warn eval)),
@@ -142,7 +131,7 @@ sub return_a_list { qw(a 1 b 2) }
 my @ret = run({ return_a_list });
 is_deeply(\@ret, [{qw(a 1 b 2)}] );
 
-my $where;
+our $where;
 sub passover {
     my $delay = shift;
     $where .= 1;
@@ -153,9 +142,9 @@ sub takes_delayed {
     $where .= 2;
     force($d);
     sub { force($d) }->();
-    if ( $^V >= v5.10 ) {
+    if ( $] >= 5.010 ) {
         eval q{ my    $_ = 4; force($d) };
-        eval q{ CORE::state $_ = 5; force($d) };
+        eval q{ use feature 'state'; state $_ = 5; force($d) };
     }
     else {
         $where .= 33;
@@ -171,20 +160,6 @@ use Params::Lazy passover => '^';
     passover($where .= $_);
 }
 is($where, 123333678, "can pass delayed arguments to other subs and use them");
-
-if ( $^V >= v5.10 ) {
-    eval q{
-        $where = "";
-        my $_ = 3;
-        passover($where .= $_);
-    };
-    
-    is(
-        $where,
-        123333338,
-        "...and it grabs the right version of a variable"
-    );
-}
 
 sub return_delayed { return shift }
 use Params::Lazy return_delayed => '^;@';
@@ -208,46 +183,14 @@ my $d = do {
     is($delay, "_1__1_", "Delayed arguments are not closures");
     like(
         $w,
-        qr/Use of uninitialized value \$foo in concatenation/,
+        qr/Use of uninitialized value(?: \$foo)? in concatenation/,
         "Warns if a delayed argument used a variable that went out of scope"
     );
 }
 
-$d = do {
-    my $_ = "_55_";
-    my $f = return_delayed("<$_>");
-    is(
-        force($f),
-        "<$_>",
-        "can return a delayed argument referencing a lexical \$_ and use it"
-    );
-    
-    is(
-        eval 'force($f)',
-        "<$_>",
-        "eval 'force(delayed arg that references a lexical)'"
-    );
-    
-=begin Segfaults, Not actually supported, pathological
-    for my $sub (
-        sub { force($d) },
-        sub { my    $_ = "_66_"; force($d) },
-        sub { state $_ = "_77_"; force($d) },
-        sub { our   $_ = "_88_"; force($d) },
-        sub { our $_; local $_ = "_99_"; force($d) },
-        )
-    {
-        my $w = "";
-        local $SIG{__WARN__} = sub { $w .= shift };
-
-        $sub->();
-        like(
-            $w,
-            qr/Use of uninitialized value \$_/,
-            ""
-        );
-    }
-=cut
-};
+use lib 't/lib';
+if ($] >= 5.010) {
+    require lexical_topic_tests;
+}
 
 done_testing;

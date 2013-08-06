@@ -44,6 +44,7 @@ if (defined $pid) {
         is(join("", @out), "", "..doesn't produce unexpected output");
     }
     else {
+        open(STDERR, ">&", STDOUT);
         run_evil exit(150);
         die "Should never reach here";
     }

@@ -13,8 +13,7 @@ sub fakemap {
 sub fakegrep {
    my $code = shift;
    my @ret;
-   while ( my ($i, $v) = each @_ ) {
-      local $_ = $v;
+   for (@_) {
       push @ret, $_ if force($code);
    }
    return @ret;
