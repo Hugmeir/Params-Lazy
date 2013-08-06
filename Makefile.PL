@@ -1,6 +1,22 @@
 use 5.006;
 use strict;
 use warnings FATAL => 'all';
+
+# Thanks, List::Gather!
+use Devel::CallChecker;
+use IO::File;
+
+write_header('callchecker0.h', Devel::CallChecker::callchecker0_h);
+
+sub write_header {
+    my ($header, $content) = @_;
+    my $fh = IO::File->new($header, 'w') or die $!;
+    $fh->print($content) or die $!;
+    $fh->close or die $!;
+}
+
+1;
+
 use ExtUtils::MakeMaker;
 
 WriteMakefile(
@@ -10,17 +26,24 @@ WriteMakefile(
     ABSTRACT_FROM    => 'lib/Params/Lazy.pm',
     LICENSE          => 'Artistic_2_0',
     PL_FILES         => {},
-    MIN_PERL_VERSION => 5.006,
+    MIN_PERL_VERSION => 5.008008,
     CONFIGURE_REQUIRES => {
         'ExtUtils::MakeMaker' => 0,
+        "Devel::CallChecker" => 0,
+        "IO::File" => 0,
     },
     BUILD_REQUIRES => {
         'Test::More' => 0,
     },
     PREREQ_PM => {
-        #'ABC'              => 1.6,
-        #'Foo::Bar::Module' => 5.0401,
+        "Devel::CallChecker" => 0,
+        "XSLoader" => 0,
+        "strict" => 0,
+        "warnings" => 0,
     },
     dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
-    clean => { FILES => 'Params-Lazy-*' },
+    clean => { FILES => 'Params-Lazy-* callchecker0.h' },
+    test  => {
+        TESTS => "t/*.t"
+    }
 );

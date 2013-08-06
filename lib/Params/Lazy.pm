@@ -6,6 +6,8 @@ use warnings FATAL => 'all';
 
 use Carp;
 
+use Devel::CallChecker;
+
 require Exporter;
 our @ISA       = qw(Exporter);
 our @EXPORT    = "force";
