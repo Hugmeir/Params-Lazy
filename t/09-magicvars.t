@@ -28,22 +28,19 @@ if ( $] >= 5.014 ) {
               'lazy_return(${^GLOBAL_PHASE}) works';
 }
 
-my $when;
 BEGIN {
     if ( $] >= 5.014 ) {
         lazy_test ${^GLOBAL_PHASE},
               "START",
-              'lazy_return(${^GLOBAL_PHASE}) works';
+              'BEGIN{lazy_return(${^GLOBAL_PHASE})}';
     }
     
-    $when = lazy_return ${^GLOBAL_PHASE};
+=begin All kinds of screwy behavior
+    my $when = lazy_return ${^GLOBAL_PHASE};
+=cut
 }
 
-is(
-   force($when),
-   "RUN",
-   ""
-);
+
 
 # Crashes on 5.10.1
 if ( $] != 5.010001 ) {
