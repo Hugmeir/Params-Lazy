@@ -163,11 +163,22 @@ THX_ck_entersub_args_delay(pTHX_ OP *entersubop, GV *namegv, SV *ckobj)
     prev = aop;
     
     for (aop = aop->op_sibling; aop->op_sibling; aop = aop->op_sibling) {
-        if ( len < protolen && protopv[len] == '^' ) {
-            aop = replace_with_delayed(aTHX_ aop);
-            prev->op_sibling = aop;
-            
-            protopv[len] = '$';
+        if ( len < protolen ) {
+            switch ( protopv[len] ) {
+                case ':':
+                    if ( aop->op_type == OP_REFGEN ) {
+                        protopv[len] = '&';
+                        break;
+                    }
+                    /* Fallthrough */
+                case '^':
+                {
+                    aop = replace_with_delayed(aTHX_ aop);
+                    prev->op_sibling = aop;
+                    protopv[len] = '$';
+                    break;
+                }
+            }
         }
         prev = aop;
         len++;

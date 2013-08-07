@@ -73,6 +73,21 @@ Version 0.01
 
     my @goodies = fakemap "<$_>", 1..10; # same as map "<$_>", 1..10;
     ...
+    
+    sub fakegrep (&@) {
+        my $delayed = shift;
+        my $coderef = ref($delayed) eq 'CODE';
+        my @retvals;
+        for (@_) {
+            if ($coderef ? $delayed->() : force($delayed)) {
+                push @retvals, $_;
+            }
+        }
+    }
+    use Params::Lazy fakegrep => ':@';
+    
+    say fakegrep { $_ % 2 } 9, 16, 25, 36;
+    say fakegrep   $_ % 2,  9, 16, 25, 36;
 
 =head1 DESCRIPTION
 
@@ -80,14 +95,21 @@ The Params::Lazy module provides a way to transparently create lazy
 arguments for a function, without the callers being aware that anything
 unusual is happening under the hood.
 
-Usage is simple: Define a function, then C<use> the module, followed by
-the function you want the lazy magic on, and a prototype-looking
-string.  Every caret in that string is taken to mean "make this a lazy
-argument."
+You can enable a lazy argument by defining a function normally, then
+C<use> the module, followed by the function name, and a 
+prototype-looking string.  Besides the normal characters allowed in a
+prototype, that string takes two new options: A caret (C<^>) which means
+"make this argument lazy", and a colon (C<:>), which will be explained
+later.
 After that, when the function is called, instead of receiving the
 result of whatever expression the caller put there, the delayed
-arguments will instead be a simple scalar reference.  Only if you pass that variable to C<force()> will the
-delayed expression be run.
+arguments will instead be a simple scalar reference.  Only if you
+pass that variable to C<force()> will the delayed expression be run.
+
+The colon (C<:>) is special cased to work with the C<&> prototype. 
+The gist of it is that, if the expression is something that the
+C<&> prototype would allow, it stays out of the way and gives you that.
+Otherwise, it gives you a delayed argument you can use with C<force()>.
 
 =head1 EXPORT
 
@@ -102,7 +124,14 @@ Strange things will happen if you goto LABEL out of a lazy argument.
 It's also important to note that delayed arguments are *not* closures,
 so storing them for later use will likely lead to crashes, segfaults,
 and a general feeling of malignancy to descend upon you, your family,
-and your cat.
+and your cat.  Passing them to other functions should work fine, but
+returning them to the place where they were delayed is generally a
+bad idea.
+
+Throwing an exception within a delayed eval might not work properly
+on older Perls (particularly, the 5.8 series).  Similarly, there's
+a bug in Perl 5.10.1 that makes delaying a regular expression likely
+to crash the program.
 
 Finally, delayed arguments, although intended to be faster & more light
 weight than coderefs, are currently about twice as slow as passing
