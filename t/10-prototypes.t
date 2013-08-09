@@ -3,6 +3,9 @@ use warnings;
 
 use Test::More;
 
+sub fakemap (&@);
+use Params::Lazy fakemap => ':@';
+
 sub fakemap (&@) {
     my $code    = shift;
     my $coderef = ref($code) eq 'CODE';
@@ -12,7 +15,6 @@ sub fakemap (&@) {
     }
     return @ret;
 }
-use Params::Lazy fakemap => ':@';
 
 is_deeply(
     [ fakemap "_${_}_", 1..10 ],
