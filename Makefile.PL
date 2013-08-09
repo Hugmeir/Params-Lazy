@@ -1,4 +1,4 @@
-use 5.006;
+{ require 5.008 };
 use strict;
 use warnings FATAL => 'all';
 
