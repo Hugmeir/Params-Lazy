@@ -23,19 +23,38 @@ XSLoader::load('Params::Lazy', $VERSION);
 
 sub import {
     my $self = shift;
+    
+    if ( @_ && @_ % 2 ) {
+        croak("You passed in an uneven list of values, "
+            . "but that doesn't make sense");
+    }
+    
     while (@_) {
         my ($name, $proto) = splice(@_, 0, 2);
         if (grep !defined, $name, $proto) {
-           croak("yadda");
+           croak("Both the function name and the "
+               . "pseudo-prototype must be defined");
         }
 
-        if ($name !~ /::/) {
-           $name = scalar caller() . "::" . $name;
+        my $coderef;
+        if ( (ref($name) || "") eq 'CODE' ) {
+            $coderef = $name;
         }
-
-        my $glob = do { no strict "refs"; *$name };
-
-        Params::Lazy::cv_set_call_checker_delay(*{$glob}{CODE}, $proto);
+        else {
+            if ($name !~ /::/) {
+               $name = scalar caller() . "::" . $name;
+            }
+ 
+            $coderef = do { no strict "refs"; *{$name}{CODE} };
+ 
+            if ( !$coderef ) {
+                croak("$name should already be defined or "
+                    . "predeclared before trying to give it "
+                    . "lazy magic");
+            }
+        }
+        
+        Params::Lazy::cv_set_call_checker_delay($coderef, $proto);
     }
 
     $self->export_to_level(1);
