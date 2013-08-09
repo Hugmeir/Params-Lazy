@@ -2,11 +2,10 @@ use 5.006;
 use strict;
 use warnings FATAL => 'all';
 
-# Thanks, List::Gather!
-use Devel::CallChecker;
+use if $] < 5.014, "Devel::CallChecker";
 use IO::File;
 
-write_header('callchecker0.h', Devel::CallChecker::callchecker0_h);
+write_header('callchecker0.h', &Devel::CallChecker::callchecker0_h) if $] < 5.014;
 
 sub write_header {
     my ($header, $content) = @_;
@@ -29,14 +28,14 @@ WriteMakefile(
     MIN_PERL_VERSION => 5.008008,
     CONFIGURE_REQUIRES => {
         'ExtUtils::MakeMaker' => 0,
-        "Devel::CallChecker" => 0,
+        ( $] < 5.014 ? ("Devel::CallChecker" => 0) : () ),
         "IO::File" => 0,
     },
     BUILD_REQUIRES => {
         'Test::More' => 0,
     },
     PREREQ_PM => {
-        "Devel::CallChecker" => 0,
+        ( $] < 5.014 ? ("Devel::CallChecker" => 0) : () ),
         "XSLoader" => 0,
         "strict" => 0,
         "warnings" => 0,

@@ -6,7 +6,10 @@ use warnings FATAL => 'all';
 
 use Carp;
 
-use Devel::CallChecker;
+# The call checker API is available on newer Perls;
+# making the dependency on D::CC conditional lets me
+# test this on an uninstalled blead.
+use if $] < 5.014, "Devel::CallChecker";
 
 require Exporter;
 our @ISA       = qw(Exporter);

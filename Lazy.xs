@@ -3,7 +3,10 @@
 #include "XSUB.h"
 
 #include "ppport.h"
+
+#if (PERL_REVISION == 5 && PERL_VERSION < 14)
 #include "callchecker0.h"
+#endif
 
 #if (PERL_REVISION == 5 && PERL_VERSION >= 10)
 #  define GOT_CUR_TOP_ENV
@@ -275,6 +278,7 @@ PPCODE:
             if ( PL_scopestack_ix >= oldscope ) {
                 /* lazy eval { die }, lazy do { eval { die } } */
                 /* Leave the eval */
+                /* XXX TODO this doesn't quite work on 5.8 */
                 LEAVE;
                 break;
             }
