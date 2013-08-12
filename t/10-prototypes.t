@@ -86,4 +86,13 @@ is_deeply(
     "fakegrep EXPR"
 );
 
+my @avoid;
+@_ = (sub { push @avoid, $_ }, 1..10);
+&fakegrep;
+is_deeply(
+    \@avoid,
+    [1..10],
+    "can use &sub to avoid lazifying"
+);
+
 done_testing;
