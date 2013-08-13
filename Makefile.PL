@@ -3,7 +3,7 @@ use strict;
 use warnings FATAL => 'all';
 
 use if $] < 5.014, "Devel::CallChecker";
-use IO::File;
+use if $] < 5.014, "IO::File";
 
 write_header('callchecker0.h', &Devel::CallChecker::callchecker0_h) if $] < 5.014;
 
@@ -29,10 +29,10 @@ WriteMakefile(
     CONFIGURE_REQUIRES => {
         'ExtUtils::MakeMaker' => 0,
         ( $] < 5.014 ? ("Devel::CallChecker" => 0) : () ),
-        "IO::File" => 0,
+        ( $] < 5.014 ? ("IO::File" => 0) : () ),
     },
     BUILD_REQUIRES => {
-        'Test::More' => 0,
+        'Test::More' => 0.94,
     },
     PREREQ_PM => {
         ( $] < 5.014 ? ("Devel::CallChecker" => 0) : () ),

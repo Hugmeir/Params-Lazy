@@ -16,10 +16,7 @@ t/07-caller.t
 t/08-evil.t
 t/09-magicvars.t
 t/10-prototypes.t
-t/boilerplate.t
 t/lib/lexical_topic_tests.pm
-t/manifest.t
-t/pod-coverage.t
-t/pod.t
+t/author.t
 ignore.txt
 MANIFEST.SKIP
