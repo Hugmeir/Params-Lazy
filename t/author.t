@@ -4,8 +4,10 @@ use strict;
 use warnings FATAL => 'all';
 use Test::More;
 
-unless ( $ENV{RELEASE_TESTING} ) {
-    plan( skip_all => "Author tests not required for installation" );
+BEGIN {
+    unless ( $ENV{RELEASE_TESTING} ) {
+        plan( skip_all => "Author tests not required for installation" );
+    }
 }
 
 subtest manifest => sub {
