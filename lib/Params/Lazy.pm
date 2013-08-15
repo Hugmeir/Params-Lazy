@@ -16,7 +16,7 @@ our @ISA       = qw(Exporter);
 our @EXPORT    = "force";
 our @EXPORT_OK = "force";
 
-our $VERSION = '0.01';
+our $VERSION = '0.001';
 
 require XSLoader;
 XSLoader::load('Params::Lazy', $VERSION);
@@ -70,7 +70,7 @@ Params::Lazy - Transparent lazy arguments for subroutines.
 
 =head1 VERSION
 
-Version 0.01
+Version 0.001
 
 =head1 SYNOPSIS
 
