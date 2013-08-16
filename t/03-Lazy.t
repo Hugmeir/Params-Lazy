@@ -160,6 +160,7 @@ sub takes_delayed {
     force($d);
     sub { force($d) }->();
     if ( $] >= 5.010 ) {
+        no if $] >= 5.018, warnings => "experimental::lexical_topic";
         eval q{ my    $_ = 4; force($d) };
         eval q{ use feature 'state'; state $_ = 5; force($d) };
     }
