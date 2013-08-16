@@ -202,16 +202,12 @@ THX_ck_entersub_args_delay(pTHX_ OP *entersubop, GV *namegv, SV *ckobj)
     return ck_entersub_args_proto(entersubop, namegv, proto);
 }
 
-MODULE = Params::Lazy		PACKAGE = Params::Lazy		
-
-void
-cv_set_call_checker_delay(CV *cv, SV *proto)
-CODE:
-    cv_set_call_checker(cv, THX_ck_entersub_args_delay, proto);
-
-void
-force(SV *sv)
-PREINIT:
+STATIC void
+S_do_force(pTHX)
+{
+    dSP;
+    dJMPENV;
+    SV *sv = POPs;
     delay_ctx *ctx;
     const I32 gimme = GIMME_V;
     I32 i, oldscope;
@@ -223,9 +219,6 @@ PREINIT:
     /* PL_curstack and PL_stack_sp in the delayed OPs */
     AV *delayed_curstack;
     SV **delayed_sp;
-PPCODE:
-    dSP;
-    dJMPENV;
 
     if ( SvROK(sv) && SvMAGICAL(SvRV(sv)) ) {
         ctx  = (void *)SvMAGIC(SvRV(sv))->mg_ptr;
@@ -327,21 +320,27 @@ PPCODE:
     (void)POPMARK;
     POPSTACK;
     
-    SPAGAIN;
-    
-    PUSHMARK(SP);
-    
-    (void)POPs;
-
     if ( retvals && gimme != G_VOID ) {
-        EXTEND(SP, retvals);
+        EXTEND(PL_stack_sp, retvals);
         
         for (i = retvals; i-- > before;) {
-            mPUSHs(*(delayed_sp-i));
+            *++PL_stack_sp = sv_2mortal(*(delayed_sp-i));
         }
         SvREFCNT_dec(delayed_curstack);
     }
     
-    (void)POPMARK;
+}
 
+MODULE = Params::Lazy		PACKAGE = Params::Lazy		
+
+void
+cv_set_call_checker_delay(CV *cv, SV *proto)
+CODE:
+    cv_set_call_checker(cv, THX_ck_entersub_args_delay, proto);
+
+void
+force(sv)
+PPCODE:
+    S_do_force(aTHX);
+    SP = PL_stack_sp;
     
