@@ -214,6 +214,9 @@ S_do_force(pTHX)
 #ifndef GOT_CUR_TOP_ENV
     JMPENV *cur_top_env;
 #endif
+#ifdef CXp_MULTICALL
+    PERL_CONTEXT *cx;
+#endif
     IV retvals, before;
     int ret = 0;
     /* PL_curstack and PL_stack_sp in the delayed OPs */
@@ -252,6 +255,19 @@ S_do_force(pTHX)
 #ifndef GOT_CUR_TOP_ENV
     cur_top_env = PL_top_env;
 #endif
+    
+    /* Disallow "delay goto &sub" and similar
+     * This is required because of a possible regression in
+     * perls 5.18 and newer, which caused this to segfault
+     * because it wouldn't recognize it as outside of a sub.
+     * "Possible" because it's more likely that it was never
+     * supposed to work.
+     */
+#ifdef CXp_MULTICALL
+    cx = &cxstack[cxstack_ix];
+    cx->cx_type |= CXp_MULTICALL;
+#endif
+
     JMPENV_PUSH(ret);
 
     switch (ret) {
