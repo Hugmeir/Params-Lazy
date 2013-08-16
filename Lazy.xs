@@ -122,14 +122,26 @@ replace_with_delayed(pTHX_ OP* aop) {
      */
     kid->op_sibling = 0;
 
+    /* Make GIMME in the deferred op be OPf_WANT_LIST */
+    Perl_list(aTHX_ kid);
+    
     listop = newLISTOP(OP_LIST, 0, kid, (OP*)NULL);
     LINKLIST(listop);
 
     /* Stop it from looping */
     cUNOPx(kid)->op_next = (OP*)NULL;
 
-    /* Make GIMME in the deferred op be OPf_WANT_LIST */
-    Perl_list(aTHX_ listop);
+    /* XXX TODO: Calling this twice, once before the LINKLIST
+     * and once after, solves a bug; namely, that "delay 1..10"
+     * would fail an assertion, because calling list() on an
+     * OP_LIST would call lintkids(), which in turn calls
+     * gen_constant_list for this sort of expression, and
+     * without the first list(), it confuses the range
+     * with a flip-flop.
+     * Obviously this is suboptimal and probably works by sheer
+     * luck, so, FIXME
+     */
+    Perl_list(aTHX_ listop);   
     
     ctx->delayed = (OP*)listop;
 
