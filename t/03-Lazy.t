@@ -19,7 +19,8 @@ sub stress_test {
     my $j = join "", "<", force($_[0]), ">";
     $returns{join} = $j;
 
-    open my $fh, ">", \my $tmp;
+    my $tmp = "";
+    open my $fh, ">", \$tmp;
     print $fh "<", force($_[0]), ">";
     close $fh;
     $returns{print} = $tmp;
