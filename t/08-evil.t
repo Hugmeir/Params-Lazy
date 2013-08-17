@@ -50,20 +50,24 @@ is_deeply(\@ret, [1..10], "can modify \@_ from a lazy arg");
 sub run_evil { force($_[0]); fail("Should never reach here") }
 use Params::Lazy run_evil => '^';
 
-my $pid = open my $pipe, '-|';
+SKIP: {
+    skip("No open -| on windows", 2) if $^O eq 'MSWin32';
 
-if (defined $pid) {    
-    if ( $pid ) {
-        my @out = <$pipe>;
-        waitpid $pid, 0;
-        my $exit_status = $? >> 8;
-        is($exit_status, 150, "lazy_run exit()");
-        is(join("", @out), "", "..doesn't produce unexpected output");
-    }
-    else {
-        open(STDERR, ">&", STDOUT);
-        run_evil exit(150);
-        die "Should never reach here";
+    my $pid = open my $pipe, '-|';
+
+    if (defined $pid) {    
+        if ( $pid ) {
+            my @out = <$pipe>;
+            waitpid $pid, 0;
+            my $exit_status = $? >> 8;
+            is($exit_status, 150, "lazy_run exit()");
+            is(join("", @out), "", "..doesn't produce unexpected output");
+        }
+        else {
+            open(STDERR, ">&", STDOUT);
+            run_evil exit(150);
+            die "Should never reach here";
+        }
     }
 }
 
