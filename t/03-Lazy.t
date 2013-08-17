@@ -10,9 +10,11 @@ sub stress_test {
 
     local $_ = "set in stress_test";
     
-    my $x = force($_[0]);
+    # These calls to force() don't use parens, which triggers
+    # the custom op, if available.
+    my $x = force $_[0];
     $returns{scalar} = $x;
-    my @x = force($_[0]);
+    my @x = force $_[0];
     $returns{list} = \@x;
     my $j = join "", "<", force($_[0]), ">";
     $returns{join} = $j;
@@ -25,11 +27,11 @@ sub stress_test {
     {
         my $w = "";
         local $SIG{__WARN__} = sub { $w .= shift };
-        warn force($_[0]);
+        warn force $_[0];
         my $file = __FILE__;
         ($returns{warn}) = $w =~ m/(\A.+?) at $file/s;
         $w = "";
-        warn "<", force($_[0]), ">";
+        warn "<", force $_[0], ">";
         ($returns{warn_list}) = $w =~ m/(\A.+?) at $file/s;
     }
     

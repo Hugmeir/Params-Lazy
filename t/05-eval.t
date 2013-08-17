@@ -3,7 +3,9 @@ use warnings;
 
 use Test::More tests => $] >= 5.016 ? 20 : 19;
 
-sub lazy_run { force($_[0]) };
+use Params::Lazy; # import the custom-op force()
+
+sub lazy_run { force $_[0] };
 
 use Params::Lazy lazy_run => '^';
 

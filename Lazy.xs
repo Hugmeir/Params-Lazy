@@ -15,6 +15,10 @@
 #  endif
 #endif
 
+#ifdef XopENTRY_set
+#  define GOT_CUSTOM_OPS
+#endif
+
 #ifndef MUTABLE_AV
 #  define MUTABLE_AV(p)   ((AV *)(void *)(p))
 #endif
@@ -347,7 +351,57 @@ S_do_force(pTHX)
     
 }
 
+#ifdef GOT_CUSTOM_OPS
+static OP*
+S_pp_force(pTHX)
+{
+    PL_stack_sp--;
+    ENTER;
+    S_do_force(aTHX);
+    LEAVE;
+    return NORMAL;
+}
+
+static OP *
+S_ck_force(pTHX_ OP *entersubop, GV *namegv, SV *cv)
+{
+    OP *aop, *prev, *first = NULL;
+    UNOP *newop;
+
+    ck_entersub_args_proto(entersubop, namegv, cv);
+
+    aop = cUNOPx(entersubop)->op_first;
+    if (!aop->op_sibling)
+       aop = cUNOPx(aop)->op_first;
+    prev = aop;
+    aop = aop->op_sibling;
+    first = aop;
+    prev->op_sibling = first->op_sibling;
+    first->op_flags &= ~OPf_MOD;
+    aop = aop->op_sibling;
+    /* aop now points to the cvop */
+    prev->op_sibling = aop->op_sibling;
+    aop->op_sibling = NULL;
+    first->op_sibling = aop;
+
+    NewOp(1234, newop, 1, UNOP);
+    newop->op_type    = OP_CUSTOM;
+    newop->op_ppaddr  = S_pp_force;
+    newop->op_first   = first;
+    newop->op_private = 1;
+    newop->op_flags   = entersubop->op_flags;
+
+    op_free(entersubop);
+
+    return (OP *)newop;
+}
+
+static XOP my_xop;
+#endif /* GOT_CUSTOM_OPS */
+
 MODULE = Params::Lazy		PACKAGE = Params::Lazy		
+
+PROTOTYPES: ENABLE
 
 void
 cv_set_call_checker_delay(CV *cv, SV *proto)
@@ -356,7 +410,20 @@ CODE:
 
 void
 force(sv)
+PROTOTYPE: $
 PPCODE:
     S_do_force(aTHX);
     SP = PL_stack_sp;
-    
+
+BOOT:
+{
+#ifdef GOT_CUSTOM_OPS
+    CV * const cv = get_cvn_flags("Params::Lazy::force", 19, 0);
+    cv_set_call_checker(cv, S_ck_force, (SV *)cv);
+
+    XopENTRY_set(&my_xop, xop_name, "force");
+    XopENTRY_set(&my_xop, xop_desc, "force");
+    XopENTRY_set(&my_xop, xop_class, OA_UNOP);
+    Perl_custom_op_register(aTHX_ S_pp_force, &my_xop);
+#endif
+}
