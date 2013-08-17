@@ -1,4 +1,7 @@
 #define PERL_NO_GET_CONTEXT 1
+#ifdef WIN32
+#  define NO_XSLOCKS
+#endif
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
