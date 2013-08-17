@@ -93,6 +93,26 @@ THX_linklist(pTHX_ OP *o)
 #  endif
 #endif
 
+#ifndef op_contextualize
+#  define scalar(op) Perl_scalar(aTHX_ op)
+#  define list(op) Perl_list(aTHX_ op)
+#  define scalarvoid(op) Perl_scalarvoid(aTHX_ op)
+# define op_contextualize(op, c) THX_op_contextualize(aTHX_ op, c)
+OP *
+THX_op_contextualize(pTHX_ OP *o, I32 context)
+{
+    switch (context) {
+        case G_SCALAR: return scalar(o);
+        case G_ARRAY:  return list(o);
+        case G_VOID:   return scalarvoid(o);
+        default:
+            Perl_croak(aTHX_ "panic: op_contextualize bad context %ld",
+                       (long) context);
+            return o;
+    }
+}
+#endif
+
 typedef struct {
  OP *delayed;
  
@@ -145,7 +165,7 @@ replace_with_delayed(pTHX_ OP* aop) {
     kid->op_sibling = 0;
 
     /* Make GIMME in the deferred op be OPf_WANT_LIST */
-    Perl_list(aTHX_ kid);
+    op_contextualize(kid, G_ARRAY);
     
     listop = newLISTOP(OP_LIST, 0, kid, (OP*)NULL);
     LINKLIST(listop);
@@ -163,7 +183,7 @@ replace_with_delayed(pTHX_ OP* aop) {
      * Obviously this is suboptimal and probably works by sheer
      * luck, so, FIXME
      */
-    Perl_list(aTHX_ listop);   
+    op_contextualize(listop, G_ARRAY);
     
     ctx->delayed = (OP*)listop;
 
