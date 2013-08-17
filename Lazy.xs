@@ -1,3 +1,4 @@
+#define PERL_NO_GET_CONTEXT 1
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
@@ -36,6 +37,23 @@ THX_save_pushptr(pTHX_ void *const ptr, const int type)
     SSCHECK(2);
     SSPUSHPTR(ptr);
     SSPUSHINT(type);
+}
+#endif
+
+#ifndef cxinc
+#  define cxinc()       THX_cxinc(aTHX)
+/* Taken from scope.c */
+I32
+THX_cxinc(pTHX)
+{
+    dVAR;
+    const IV old_max = cxstack_max;
+    cxstack_max = cxstack_max + 1;
+    Renew(cxstack, cxstack_max + 1, PERL_CONTEXT);
+    /* Without any kind of initialising deep enough recursion
+     * will end up reading uninitialised PERL_CONTEXTs. */
+    PoisonNew(cxstack + old_max + 1, cxstack_max - old_max, PERL_CONTEXT);
+    return cxstack_ix + 1;
 }
 #endif
 
@@ -206,6 +224,12 @@ THX_ck_entersub_args_delay(pTHX_ OP *entersubop, GV *namegv, SV *ckobj)
     return ck_entersub_args_proto(entersubop, namegv, proto);
 }
 
+#ifdef CXp_MULTICALL
+#  define CX_BLOCK_FLAG CXp_MULTICALL
+#else
+#  define CX_BLOCK_FLAG CXp_TRYBLOCK
+#endif
+
 STATIC void
 S_do_force(pTHX)
 {
@@ -215,11 +239,10 @@ S_do_force(pTHX)
     delay_ctx *ctx;
     const I32 gimme = GIMME_V;
     I32 i, oldscope;
+    U32 cx_type_flag = CX_BLOCK_FLAG;
+    PERL_CONTEXT *cx;
 #ifndef GOT_CUR_TOP_ENV
     JMPENV *cur_top_env;
-#endif
-#ifdef CXp_MULTICALL
-    PERL_CONTEXT *cx;
 #endif
     IV retvals, before;
     int ret = 0;
@@ -237,7 +260,11 @@ S_do_force(pTHX)
     SAVEOP();
     SAVECOMPPAD();
 
+#if (PERL_REVISION == 5 && PERL_VERSION >= 10)
+    PUSHSTACKi(PERLSI_SORT);
+#else
     PUSHSTACK;
+#endif
 
     /* The SAVECOMPPAD and SAVEOP will restore these */
     PL_curpad  = AvARRAY(ctx->comppad);
@@ -246,31 +273,28 @@ S_do_force(pTHX)
     
     PUSHMARK(PL_stack_sp);
     
-    before = (IV)(PL_stack_sp-PL_stack_base);
-    
-    /* Call the deferred ops */
-    /* Unfortunately we can't just do a CALLRUNOPS, since we must
-     * handle the case of the delayed op being an eval, or a
-     * pseudo-block with an eval inside, and that eval dying.
-     */
-    
+    before      = (IV)(PL_stack_sp-PL_stack_base);    
 
     oldscope    = PL_scopestack_ix;
 #ifndef GOT_CUR_TOP_ENV
     cur_top_env = PL_top_env;
 #endif
-    
-    /* Disallow "delay goto &sub" and similar
+
+    /* Disallow "delay goto &sub" and similar by pretending
+     * to be a MULTICALL sub, or an eval block on 5.8.
      * This is required because of a possible regression in
-     * perls 5.18 and newer, which caused this to segfault
-     * because it wouldn't recognize it as outside of a sub.
+     * perls 5.18 and newer, which caused it to segfault
+     * because it wouldn't recognize us as outside of a sub.
      * "Possible" because it's more likely that it was never
      * supposed to work.
      */
-#ifdef CXp_MULTICALL
-    cx = &cxstack[cxstack_ix];
-    cx->cx_type |= CXp_MULTICALL;
-#endif
+    PUSHBLOCK(cx, cx_type_flag, PL_stack_sp);
+
+    /* Call the deferred ops */
+    /* Unfortunately we can't just do a CALLRUNOPS, since we must
+     * handle the case of the delayed op being an eval, or a
+     * pseudo-block with an eval inside, and that eval dying.
+     */
 
     JMPENV_PUSH(ret);
 
@@ -337,6 +361,9 @@ S_do_force(pTHX)
         }
     }
 
+    /* Lightweight POPBLOCK */
+    cxstack_ix--;
+    
     (void)POPMARK;
     POPSTACK;
     

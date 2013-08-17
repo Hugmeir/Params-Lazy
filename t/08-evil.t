@@ -4,6 +4,7 @@ use warnings;
 use Test::More;
 
 sub lazy_run {
+    no warnings 'exiting';
     FOO: {
         eval { force($_[0]) };
         like($@, $_[1], $_[2]);
@@ -13,8 +14,8 @@ sub lazy_run {
 }
 use Params::Lazy lazy_run => '^$;$';
 
-sub empty {}
-sub noreturn { 1 }
+sub empty      {}
+sub noreturn   { 1 }
 sub withreturn { return 1 }
 
 my $cant_goto = qr/\QCan't goto subroutine \E(?:\Qfrom a sort sub (or similar callback)\E|outside a subroutine)/;  #'
@@ -28,9 +29,12 @@ sub {
     lazy_run goto &withreturn, $cant_goto, "inside a sub, delayed goto &explicitreturn dies";
 }->();
 
-lazy_run return, qr/\QCan't return outside a subroutine/, "a delayed return dies";
+my $return = $] < 5.010
+           ? qr/\QCan't return outside a subroutine/
+           : qr/\A\z/;
+lazy_run return, $return, "a delayed return dies";
 FOO: { lazy_run last FOO, qr/\QLabel not found for "last FOO"/, "a delayed last dies" };
-FOO: { lazy_run goto FOO, qr/\QCan't find label FOO/, "a delayed goto LABEL dies" };
+FOO: { lazy_run goto FOO, qr/\QCan't "goto" out of a pseudo block/, "a delayed goto LABEL dies" };
 
 
 sub modify_params_list {
@@ -63,17 +67,21 @@ if (defined $pid) {
     }
 }
 
-=begin goto, Pathological
 
-no warnings 'deprecated';
-run_evil do { goto DOO; };
-NOPE: {
-    last NOPE;
-    DOO:
-    {
-        pass("goto works"); # Whenever it should...
-    }
+SKIP: {
+    skip("Broken on 5.8", 1) if $] < 5.010;
+    eval {
+        no warnings 'deprecated';
+        run_evil do { goto DOO; };
+        NOPE: {
+            last NOPE;
+            DOO:
+            {
+                fail("should never reach here");
+            }
+        }
+    };
+    like($@, qr/\QCan't "goto" out of a pseudo block at/, "delay goto LABEL is disallowed");
 }
-=cut
 
 done_testing;
