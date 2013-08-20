@@ -163,7 +163,7 @@ bad idea.
 
 Throwing an exception within a delayed eval might not work
 properly on older Perls (particularly, the 5.8 series).
-Similarly, there's a bug in Perls 5.10.1 through 5.12.5
+Similarly, there's a bug in Perls 5.10.0 through 5.12.5
 that makes delaying a regular expression likely to crash
 the program.
 

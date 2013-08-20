@@ -40,8 +40,8 @@ BEGIN {
 =cut
 }
 
-# Crashes on 5.10.1-5.12.5
-if ( $] < 5.010001 || $] >= 5.014 ) {
+# Crashes on 5.10.0-5.12.5
+if ( $] < 5.010 || $] >= 5.014 ) {
     "a" =~ /(.)/;
     my $lazy = lazy_return "foo" =~ /(foo)(?{is($^N, "foo", "the regex matched")})/;
     force($lazy);
