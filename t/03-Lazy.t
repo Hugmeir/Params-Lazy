@@ -60,6 +60,43 @@ use Params::Lazy run => '^;@', stress_test => '^;@';
 my @range = run("a".."z");
 is_deeply(\@range, ["a".."z"], "can delay a range");
 
+my @a = 1..10;
+my $x;
+@range = ();
+my $count = 0;
+my @against;
+while ($_ = shift(@a)) {
+    my $times = int(rand(9)) || 1;
+    push @range, [run($x = /1/../10/, times => $times)];
+    if ( @a ) {
+        push @against, [ ($count+1)...($count+$times) ];
+        $count += $times;
+        is($x, $count, "the flip-flop is keeping state");
+    }
+    else {
+        my $last = $times == 1 ? ($count + 1) : 1;
+        like($x, qr/\A${last}E0\Z/, "Got the right end marker");
+        
+        my $last_batch = [ ($count + 1) . "E0" ];
+        if ( $times > 1 ) {
+            push @$last_batch, map { "1E0" } 1...$times-1;
+        }
+        push @against, $last_batch;
+        
+        is_deeply(
+            [run($x = /1/../10/, times => 5)],
+            [ map { "1E0" } 1..5 ],
+            "running the delayed flipflop again after it gets to the end keeps returning 1E0"
+        );
+    }
+}
+
+is_deeply(
+    \@range,
+    \@against,
+    "can delay a flip flop (scalar /foo/../bar/)"
+);
+
 () = @::empty;
 my @result = run(@::empty);
 is_deeply(\@result, [], "delaying an empty array doesn't return a glob");
