@@ -254,11 +254,10 @@ THX_ck_entersub_args_delay(pTHX_ OP *entersubop, GV *namegv, SV *ckobj)
 #endif
 
 STATIC void
-S_do_force(pTHX)
+S_do_force(pTHX_ SV* sv)
 {
     dSP;
     dJMPENV;
-    SV *sv = POPs;
     delay_ctx *ctx;
     const I32 gimme = GIMME_V;
     I32 i, oldscope;
@@ -407,7 +406,7 @@ S_pp_force(pTHX)
 {
     PL_stack_sp--;
     ENTER;
-    S_do_force(aTHX);
+    S_do_force(aTHX_ *PL_stack_sp--);
     LEAVE;
     return NORMAL;
 }
@@ -462,7 +461,7 @@ void
 force(sv)
 PROTOTYPE: $
 PPCODE:
-    S_do_force(aTHX);
+    S_do_force(aTHX_ *PL_stack_sp--);
     SP = PL_stack_sp;
 
 BOOT:
