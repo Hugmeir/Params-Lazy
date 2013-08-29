@@ -389,13 +389,22 @@ S_do_force(pTHX_ SV* sv)
     (void)POPMARK;
     POPSTACK;
     
-    if ( retvals && gimme != G_VOID ) {
-        EXTEND(PL_stack_sp, retvals);
-        
-        for (i = retvals; i-- > before;) {
-            *++PL_stack_sp = sv_2mortal(*(delayed_sp-i));
+    if ( gimme != G_VOID ) {
+        if ( retvals ) {
+            EXTEND(PL_stack_sp, retvals);
+            
+            for (i = retvals; i-- > before;) {
+                *++PL_stack_sp = sv_2mortal(*(delayed_sp-i));
+            }
+            SvREFCNT_dec(delayed_curstack);
         }
-        SvREFCNT_dec(delayed_curstack);
+        /* We don't have any return value, but in scalar context
+         * we must return something, so push an undef to the stack.
+         */
+        else if ( gimme == G_SCALAR ) {
+            EXTEND(PL_stack_sp, 1);
+            *++PL_stack_sp = &PL_sv_undef;
+        }
     }
     
 }
