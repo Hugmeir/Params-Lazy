@@ -522,6 +522,7 @@ S_do_force(pTHX_ SV* sv, bool use_caller_args)
                  case OP_DIE:
                  case OP_EXIT:
                  case OP_EXEC:
+                    SAVEINT(delayer_cx->cx_type);
                     delayer_cx->cx_type |= CXt_SUB;
                 }
             }
@@ -621,7 +622,7 @@ S_do_force(pTHX_ SV* sv, bool use_caller_args)
 
 /* pp_delay gets called *before* the entersub of a function with
  * delayed arguments, so it has the "original" @_ in scope.
- * This kludge allows us do DTRT for a localized @_:
+ * This kludge allows us DTRT for a localized @_:
  *     local @_ = qw(foo bar); say delay shift @_;
  * will output "foo" and modify the correct @_.  Similarly,
  *     local *_ = \@foo; say delay shift;
