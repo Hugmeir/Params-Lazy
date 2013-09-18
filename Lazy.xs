@@ -456,7 +456,8 @@ S_do_force(pTHX_ SV* sv, bool use_caller_args)
         PL_comppad = MY_CXT.orig_comppad;
     }
     else {
-        croak("Foobar");
+        /* Untested, shouldn't happen? */
+        Perl_croak(aTHX_ "Cannot restore the context for the delayed expression");
     }
 
     PL_curpad  = AvARRAY(PL_comppad);
