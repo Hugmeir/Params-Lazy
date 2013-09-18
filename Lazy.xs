@@ -126,9 +126,7 @@ THX_op_contextualize(pTHX_ OP *o, I32 context)
 }
 #endif
 
-#ifdef Perl_finalize_optree
-#  define finalize_optree(o) Perl_finalize_optree(aTHX_ o)
-#else
+#ifndef finalize_optree
 #  define finalize_optree(o) THX_finalize_optree(aTHX_ o)
 #  define finalize_op(o)     THX_finalize_op(aTHX_ o)
 
