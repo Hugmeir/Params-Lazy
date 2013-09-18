@@ -1,6 +1,6 @@
 Revision history for Params-Lazy
 
-0.004   UNRELEASED
+0.004   2013-09-18T03:48:49:-0300
         * Delaying an expression that doesn't return anything,
           like a regular expression that didn't match, and then
           running force() in scalar context will now correctly
