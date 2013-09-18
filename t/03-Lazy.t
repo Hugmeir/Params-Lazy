@@ -342,6 +342,13 @@ sub {
         'do { eval {die}; sub { $lexical } } works'
     );
 
+    $fus_sub = delay do { () = caller; sub { "fus: $fus" } };
+    is(
+        $fus_sub->(),
+        "fus: 10",
+        'do { () = caller; sub { $lexical } } works'
+    );
+
 }->();
 }
 

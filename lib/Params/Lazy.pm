@@ -220,13 +220,6 @@ on Perls 5.18 and newer.
 
 =item *
 
-In 5.16 and older, using C<delay caller> outside of a sub will not
-get the proper values.  Unfortunately for those versions, 
-this is a tradeoff to implement C<delay sub { $lex }>, so
-it's unlikely to be fixed.
-
-=item *
-
 As of version 0.004, the 'caller arguments' feature doesn't work
 if you're passing a delayed argument to another delayed function:
 

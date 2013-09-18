@@ -433,12 +433,13 @@ S_do_force(pTHX_ SV* sv, bool use_caller_args)
      */
     delayer_cx->cx_type |= CXp_SUB_RE;
 #else
-    /* Tradeoff. Makes delay sub {$lexical} work, but
-     * breaks top-level delayed caller.
-     * We MUST restore this manually for a couple of operations
-     * that do a JMPENV, like exit, die, or goto, which means
-     * that for older perls, we can't use CALLRUNOPS, but instead
-     * must do the runloop manually.
+    /* Tradeoff for older perls; makes
+     * 'delay sub {$lexical}' work, but means we have to do
+     * the runloop ourselves so we can manually restore the
+     * value in a case-by-case basis to make a couple of
+     * operations work properly; Those
+     * include top-level caller(), and anything that
+     * does a JMPENV, like exit, die, or goto.
      */
     delayer_cx->cx_type &= ~CXt_SUB;
 #endif
@@ -522,8 +523,22 @@ S_do_force(pTHX_ SV* sv, bool use_caller_args)
                  case OP_DIE:
                  case OP_EXIT:
                  case OP_EXEC:
-                    SAVEINT(delayer_cx->cx_type);
+                 case OP_CALLER:
+                    /* These ops need to know that the
+                     * delayer is a subroutine, so restore
+                     * cx_type.
+                     */
                     delayer_cx->cx_type |= CXt_SUB;
+                    break;
+                 default:
+                    /* Can't use SAVEINT() for the above, as
+                     * caller() doesn't create a scope
+                     * to automatically restore the value,
+                     * so instead we manually unset this
+                     * for every other op.
+                     */
+                    delayer_cx->cx_type &= ~CXt_SUB;
+                    break;
                 }
             }
 #endif
