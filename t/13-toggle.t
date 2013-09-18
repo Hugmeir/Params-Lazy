@@ -6,16 +6,16 @@ use Test::More;
 sub toggle;
 use Params::Lazy toggle => q(^^);
 
-my $toggle_state;
+my $toggle_state = '';
 sub toggle {
     my ($begin, $end) = @_;
     
     if ( !$toggle_state ) {
-        $toggle_state = 1 if force($begin);
+        $toggle_state = 1 if force $begin;
     }
     else {
-        if ( force($end) ) {
-            $toggle_state = 0;
+        if ( force $end ) {
+            $toggle_state = '';
             return "1E0";
         }
         else {
