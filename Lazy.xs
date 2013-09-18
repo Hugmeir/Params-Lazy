@@ -512,7 +512,7 @@ S_do_force(pTHX_ SV* sv, bool use_caller_args)
 #ifdef CXp_SUB_RE
             CALLRUNOPS(aTHX);
 #else
-            /* See comments in the previous CXp_SUB_RE to see why
+            /* See comments in the previous CXp_SUB_RE ifdef to see why
              * we do this.
              */
             while ((PL_op = PL_op->op_ppaddr(aTHX))) {
