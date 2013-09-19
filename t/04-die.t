@@ -20,7 +20,7 @@ sub dies      { die "die in sub"           }
 sub carps     { carp("carp in sub")       }
 sub croaks    { croak("croak in sub")     }
 sub confesses { confess("confess in sub") }
-sub xs_croaks { "Doesnotexist"->DOES()    }
+sub xs_croaks { force(1) }
 
 like lazy_death(die("bare die")), qr/bare die/, "lazy_death die()";
 
@@ -50,11 +50,11 @@ like
     qr/bare confess/,
     "lazy_death confess()";
 
-my $does_re = qr/\QUsage: invocan\E[dt]\Q->DOES(kind) at \E/;
+my $xs_croak_re = qr/\Qforce() requires a delayed argument/;
 like
-    lazy_death("Doesnotexist"->DOES()),
-    $does_re,
-    "lazy_death Foo->DOES()";
+    lazy_death(Doesnotexist->DOES()),
+    qr/\QUsage: invocan\E[dt]\Q->DOES(kind) at \E/,
+    "lazy_death force()";
 
 like
     lazy_death(dies()),
@@ -89,7 +89,7 @@ like
 
 like
     lazy_death(xs_croaks()),
-    $does_re,
+    $xs_croak_re,
     "xs_croaks()";
 
 use Params::Lazy lazy_run => '^';
@@ -123,12 +123,12 @@ sub call_lazy_death {
          
     eval { lazy_death xs_croaks(),       1 };
     like $@,
-         $does_re,
+         $xs_croak_re,
          "eval { lazy_death xs_croaks() }";
 
     eval { lazy_run(lazy_run(lazy_run force(1))) };
     like $@,
-        qr/\Qforce() requires a delayed argument/,
+        $xs_croak_re,
         "lazy_run(lazy_run(lazy_run force(1))) gives the proper exception";         
          
     my $lex = 10;

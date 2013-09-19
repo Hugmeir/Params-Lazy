@@ -836,6 +836,12 @@ S_ck_force(pTHX_ OP *entersubop, GV *namegv, SV *cv)
     prev->op_sibling = first->op_sibling;
     first->op_flags &= ~OPf_MOD;
     aop = aop->op_sibling;
+    
+    if ( !aop ) {
+        /* Not enough arguments for force() */
+        return entersubop;
+    }
+    
     /* aop now points to the cvop */
     prev->op_sibling = aop->op_sibling;
     aop->op_sibling = NULL;
