@@ -408,6 +408,15 @@ S_do_force(pTHX_ SV* sv, bool use_caller_args)
     /* PL_curstack and PL_stack_sp in the delayed OPs */
     AV *delayed_curstack = NULL;
     SV **delayed_sp = NULL;
+#ifndef CXp_SUB_RE
+     /* XXX We play these CvDEPTH games in <5.18 to deal
+      * with XS code calling Perl_croak() directly,
+      * because the croak won't see the CXt_SUB of the
+      * delayer's cx, and thus won't decrease its CvDEPTH
+      */
+    CV *runcv      = find_runcv(NULL);
+    I32 orig_depth = CvDEPTH(runcv);
+#endif
 
     if ( SvROK(sv) && SvMAGICAL(SvRV(sv)) ) {
         ctx  = (void *)SvMAGIC(SvRV(sv))->mg_ptr;
@@ -577,6 +586,14 @@ S_do_force(pTHX_ SV* sv, bool use_caller_args)
                 LEAVE;
                 break;
             }
+#ifndef CXp_SUB_RE
+            /* Something called Perl_croak() */
+            /* XXX this likely needs a more precise test */
+            if (   orig_depth > 0
+                && orig_depth == CvDEPTH(runcv)) {
+                CvDEPTH(runcv)--;
+            }
+#endif
             /* Fallthrough */
         default:
             /* Default behavior */
