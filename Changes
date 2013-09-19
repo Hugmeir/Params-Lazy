@@ -1,6 +1,6 @@
 Revision history for Params-Lazy
 
-0.005   UNRELEASED
+0.005   2013-09-19T13:20:11:-0300
         * Top-level caller() now works on <5.18
         * delay do { eval {die}; sub { $lexical } } no
           longer crashes.
