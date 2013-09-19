@@ -70,6 +70,38 @@ THX_cxinc(pTHX)
 }
 #endif
 
+#ifndef find_runcv
+/* Perl 5.8.8 */
+#define find_runcv(d) THX_find_runcv(aTHX_ d)
+/* Taken from pp_ctl.c in 5.8.8 */
+CV*
+THX_find_runcv(pTHX_ U32 *db_seqp)
+{
+    PERL_SI      *si;
+
+    if (db_seqp)
+        *db_seqp = PL_curcop->cop_seq;
+    for (si = PL_curstackinfo; si; si = si->si_prev) {
+        I32 ix;
+        for (ix = si->si_cxix; ix >= 0; ix--) {
+            const PERL_CONTEXT *cx = &(si->si_cxstack[ix]);
+            if (CxTYPE(cx) == CXt_SUB || CxTYPE(cx) == CXt_FORMAT) {
+                CV * const cv = cx->blk_sub.cv;
+                /* skip DB:: code */
+                if (db_seqp && PL_debstash && CvSTASH(cv) == PL_debstash) {
+                    *db_seqp = cx->blk_oldcop->cop_seq;
+                    continue;
+                }
+                return cv;
+            }
+            else if (CxTYPE(cx) == CXt_EVAL && !CxTRYBLOCK(cx))
+                return PL_compcv;
+        }
+    }
+    return PL_main_cv;
+}
+#endif /* find_runcv */
+
 #ifndef LINKLIST
 #    define LINKLIST(o) ((o)->op_next ? (o)->op_next : op_linklist((OP*)o))
 #  ifndef op_linklist
