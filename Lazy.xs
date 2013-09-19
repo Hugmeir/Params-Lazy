@@ -295,8 +295,10 @@ START_MY_CXT
 
 typedef struct {
  OP *delayed;
+#ifdef USE_ITHREADS
  AV *comppad;
  AV *comppad_name;
+#endif
 } delay_ctx;
 
 STATIC int magic_free(pTHX_ SV *sv, MAGIC *mg)
@@ -779,9 +781,11 @@ replace_with_delayed(pTHX_ OP* aop) {
     (void)OpREFCNT_set(ctx->delayed, 1);
     OP_REFCNT_UNLOCK;
     
-    ctx->comppad = PL_comppad;
+#ifdef USE_ITHREADS
+    ctx->comppad      = PL_comppad;
     ctx->comppad_name = PL_comppad_name;
-    
+#endif
+
     /* Magicalize the scalar, */
     mg = sv_magicext(magic_sv, (SV*)NULL, PERL_MAGIC_ext, &vtbl, (const char *)ctx, 0);
 
