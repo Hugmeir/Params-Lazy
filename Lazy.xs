@@ -33,10 +33,6 @@
 #  define MUTABLE_AV(p)   ((AV *)(void *)(p))
 #endif
 
-#ifndef PadlistARRAY
-#  define PadlistARRAY(pad)  AvARRAY(pad)
-#endif
-
 #ifndef save_op
 #  define save_op()     save_pushptr((void *)(PL_op), SAVEt_OP)
 #endif
