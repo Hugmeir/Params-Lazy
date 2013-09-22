@@ -220,7 +220,7 @@ on Perls 5.18 and newer.
 
 =item *
 
-As of version 0.005, the 'caller arguments' feature doesn't work
+As of version 0.005, the 'caller @_' feature doesn't work
 if you're passing a delayed argument to another delayed function:
 
     use Params::Lazy qw( delay_1 ^$ delay_2 ^$ );
@@ -234,7 +234,7 @@ if you're passing a delayed argument to another delayed function:
         );
     }->('delay_1 should see this');
     
-This is because currently, the 'delayed argument' magic is attached
+This is because currently, the 'caller @_' magic is attached
 to the delaying function, rather than the delayed argument. 
 This will be fixed in future releases.
     
