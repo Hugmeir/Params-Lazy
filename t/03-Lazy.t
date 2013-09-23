@@ -392,15 +392,14 @@ is($s, "Tiid Klo Ul", 'local *_ = [...]; delay $s .= $_[0] works');
          "...and it gives the right warning"
     );
     
-    SKIP: {
-        skip("Not implemented yet", 2);
-        sub {
-            local *_ = "test";
-            delay push @_, 'modifying @_';
-            ok(defined *_{ARRAY});
-            is_deeply(\@_, ['modifying @_']);
-        }->(' ro dah');
-    }
+    $w = '';
+    sub {
+        local *_ = "test";
+        delay push @_, 'modifying @_';
+        ok(defined *_{ARRAY}, 'it vivifies @_');
+        is_deeply(\@_, ['modifying @_'], '...and the new @_ has the values added in the delayed code');
+    }->(' ro dah');
+    is($w, '', "...and gives no warnings");
 }
 
 done_testing;
